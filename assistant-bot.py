@@ -144,81 +144,50 @@ async def cmd_start(upd: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "Assistant Bot + Opencode\n\n"
         "Envoie un message, je le passe a opencode.\n\n"
         f"Modele: {cfg['model']}\n"
-        f"Agent: {cfg.get('agent') or 'aucun'}\n"
+        f"Agent: {cfg.get('agent') or 'defaut'}\n"
         f"Session continue: {'oui' if cfg['continue_session'] else 'non'}\n"
         f"Variant: {cfg['variant'] or 'defaut'}\n\n"
-        "Tape / pour voir toutes les commandes disponibles."
+        "📌 /model /variant /agent - Menus interactifs\n"
+        "📌 /session - Gerer sessions\n"
+        "📌 /config - Voir config"
     )
 
 async def cmd_model(upd: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    args = ctx.args
-    if not args:
-        known = ", ".join(FREE_MODELS.keys())
-        cfg = load_config()
-        await upd.message.reply_text(
-            f"Modele actuel: {cfg['model']}\n\n"
-            f"Disponibles: {known}\n"
-            "Usage: /model deepseek\n"
-            "Ou utiliser /model_deepseek directement."
-        )
-        return
-    name = args[0].lower()
-    if name in FREE_MODELS:
-        cfg = load_config()
-        cfg["model"] = FREE_MODELS[name]
-        save_config(cfg)
-        await upd.message.reply_text(f"Modele change: {FREE_MODELS[name]}")
-    else:
-        known = ", ".join(FREE_MODELS.keys())
-        await upd.message.reply_text(f"Modele inconnu. Disponibles: {known}")
+    cfg = load_config()
+    kb = [[InlineKeyboardButton("🎯 Defaut", callback_data="mod_sel_")]]
+    for key in FREE_MODELS:
+        name = FREE_MODELS[key]
+        mark = " ✓" if name == cfg["model"] else ""
+        kb.append([InlineKeyboardButton(f"{key}{mark}", callback_data=f"mod_sel_{key}")])
+    cfg = load_config()
+    await upd.message.reply_text(
+        f"Modele actuel: **{cfg['model']}**\n\nChoisis un modele :",
+        reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown"
+    )
 
 async def cmd_variant(upd: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    args = ctx.args
-    if not args:
-        cfg = load_config()
-        await upd.message.reply_text(
-            f"Variant actuel: {cfg['variant'] or 'aucun'}\n\n"
-            "Usage: /variant high (ou /variant_high)")
-        return
-    val = args[0].lower()
     cfg = load_config()
-    if val == "none":
-        cfg["variant"] = ""
-        save_config(cfg)
-        await upd.message.reply_text("Variant desactive (defaut)")
-    elif val in ("high", "max", "minimal"):
-        cfg["variant"] = val
-        save_config(cfg)
-        await upd.message.reply_text(f"Variant change: {val}")
-    else:
-        await upd.message.reply_text("Variants: high, max, minimal, none")
+    variants = {"defaut": "", "high": "high", "max": "max", "minimal": "minimal"}
+    kb = []
+    for label, val in variants.items():
+        mark = " ✓" if cfg.get("variant", "") == val else ""
+        kb.append([InlineKeyboardButton(f"{label}{mark}", callback_data=f"var_sel_{val or 'none'}")])
+    await upd.message.reply_text(
+        f"Variant actuel: **{cfg['variant'] or 'defaut'}**\n\nChoisis un variant :",
+        reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown"
+    )
 
 async def cmd_agent(upd: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    args = ctx.args
     cfg = load_config()
-    if not args:
-        await upd.message.reply_text(
-            f"Agent actuel: {cfg.get('agent') or 'aucun (defaut)'}\n\n"
-            "Agents disponibles:\n"
-            "/agent_plan - Mode planification\n"
-            "/agent_build - Mode developpement\n"
-            "/agent_explore - Exploration (lecture seule)\n"
-            "/agent_general - Agent general\n"
-            "/agent_none - Agent par defaut"
-        )
-        return
-    name = args[0].lower()
-    cfg = load_config()
-    if name == "none":
-        cfg["agent"] = ""
-        save_config(cfg)
-        await upd.message.reply_text("Agent desactive (mode defaut)")
-    elif name in AGENTS:
-        cfg["agent"] = AGENTS[name]
-        save_config(cfg)
-        await upd.message.reply_text(f"Agent change: {name}")
-    else:
-        await upd.message.reply_text(f"Agents: {', '.join(AGENTS.keys())}, none")
+    kb = [[InlineKeyboardButton("🎯 Defaut", callback_data="agt_sel_none")]]
+    for key in AGENTS:
+        val = AGENTS[key]
+        mark = " ✓" if cfg.get("agent", "") == val else ""
+        kb.append([InlineKeyboardButton(f"{key}{mark}", callback_data=f"agt_sel_{key}")])
+    await upd.message.reply_text(
+        f"Agent actuel: **{cfg.get('agent') or 'defaut'}**\n\nChoisis un agent :",
+        reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown"
+    )
 
 async def cmd_session(upd: Update, ctx: ContextTypes.DEFAULT_TYPE):
     args = ctx.args
@@ -406,23 +375,9 @@ async def chat_handler(upd: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def post_init(app: Application):
     cmds = [
         BotCommand("start", "Demarrer"),
-        BotCommand("model", "Changer de modele"),
-        BotCommand("model_deepseek", "DeepSeek V4"),
-        BotCommand("model_mimo", "Mimo V2.5"),
-        BotCommand("model_nemotron", "Nemotron 3"),
-        BotCommand("model_north", "North Mini"),
-        BotCommand("model_bigpickle", "Big Pickle"),
-        BotCommand("variant", "Changer de variant"),
-        BotCommand("variant_high", "Raisonnement haut"),
-        BotCommand("variant_max", "Raisonnement max"),
-        BotCommand("variant_minimal", "Raisonnement min"),
-        BotCommand("variant_none", "Variant par defaut"),
-        BotCommand("agent", "Changer d'agent"),
-        BotCommand("agent_plan", "Planification"),
-        BotCommand("agent_build", "Developpement"),
-        BotCommand("agent_explore", "Exploration"),
-        BotCommand("agent_general", "General"),
-        BotCommand("agent_none", "Agent par defaut"),
+        BotCommand("model", "Choisir modele"),
+        BotCommand("variant", "Choisir variant"),
+        BotCommand("agent", "Choisir agent"),
         BotCommand("session", "Gerer les sessions"),
         BotCommand("session_new", "Nouvelle session"),
         BotCommand("session_list", "Liste des sessions"),
@@ -447,44 +402,7 @@ async def post_init(app: Application):
     await app.bot.set_my_commands(cmds)
     log.info("Assistant bot pret")
 
-async def quick_set_model(upd, name):
-    cfg = load_config()
-    cfg["model"] = FREE_MODELS[name]
-    save_config(cfg)
-    await upd.message.reply_text(f"Modele change: {FREE_MODELS[name]}")
 
-async def quick_set_variant(upd, val):
-    cfg = load_config()
-    cfg["variant"] = val
-    save_config(cfg)
-    await upd.message.reply_text(f"Variant: {val or 'defaut'}")
-
-async def quick_set_agent(upd, name):
-    cfg = load_config()
-    if name == "none":
-        cfg["agent"] = ""
-        await upd.message.reply_text("Agent: defaut")
-    else:
-        cfg["agent"] = AGENTS[name]
-        await upd.message.reply_text(f"Agent change: {AGENTS[name]}")
-    save_config(cfg)
-
-async def cmd_model_deepseek(upd, ctx): return await quick_set_model(upd, "deepseek")
-async def cmd_model_mimo(upd, ctx): return await quick_set_model(upd, "mimo")
-async def cmd_model_nemotron(upd, ctx): return await quick_set_model(upd, "nemotron")
-async def cmd_model_north(upd, ctx): return await quick_set_model(upd, "north")
-async def cmd_model_bigpickle(upd, ctx): return await quick_set_model(upd, "bigpickle")
-
-async def cmd_variant_high(upd, ctx): return await quick_set_variant(upd, "high")
-async def cmd_variant_max(upd, ctx): return await quick_set_variant(upd, "max")
-async def cmd_variant_minimal(upd, ctx): return await quick_set_variant(upd, "minimal")
-async def cmd_variant_none(upd, ctx): return await quick_set_variant(upd, "")
-
-async def cmd_agent_plan(upd, ctx): return await quick_set_agent(upd, "plan")
-async def cmd_agent_build(upd, ctx): return await quick_set_agent(upd, "build")
-async def cmd_agent_explore(upd, ctx): return await quick_set_agent(upd, "explore")
-async def cmd_agent_general(upd, ctx): return await quick_set_agent(upd, "general")
-async def cmd_agent_none(upd, ctx): return await quick_set_agent(upd, "none")
 
 async def cmd_continue_on(upd, ctx):
     cfg = load_config()
@@ -612,6 +530,44 @@ async def session_list_callback(upd, ctx):
             parse_mode="Markdown"
         )
 
+async def config_callbacks(upd, ctx):
+    q = upd.callback_query
+    await q.answer()
+    data = q.data
+    cfg = load_config()
+
+    if data.startswith("mod_sel_"):
+        key = data.replace("mod_sel_", "")
+        if not key:
+            cfg["model"] = DEFAULT_CONFIG["model"]
+            save_config(cfg)
+            await q.message.edit_text(f"Modele: {cfg['model']}")
+            return
+        cfg["model"] = FREE_MODELS[key]
+        save_config(cfg)
+        variants = {"defaut": "", "high": "high", "max": "max", "minimal": "minimal"}
+        kb = [[InlineKeyboardButton(l, callback_data=f"var_sel_{v or 'none'}") for l, v in variants.items()]]
+        await q.message.edit_text(
+            f"Modele: **{cfg['model']}**\n\nChoisis un variant (ou defaut) :",
+            reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown"
+        )
+
+    elif data.startswith("var_sel_"):
+        val = data.replace("var_sel_none", "")
+        val = val.replace("var_sel_", "")
+        cfg["variant"] = val
+        save_config(cfg)
+        await q.message.edit_text(f"Variant: **{val or 'defaut'}**", parse_mode="Markdown")
+
+    elif data.startswith("agt_sel_"):
+        key = data.replace("agt_sel_", "")
+        if key == "none":
+            cfg["agent"] = ""
+        else:
+            cfg["agent"] = AGENTS[key]
+        save_config(cfg)
+        await q.message.edit_text(f"Agent: **{cfg.get('agent') or 'defaut'}**", parse_mode="Markdown")
+
 def main():
     token = get_token()
     if not token:
@@ -620,22 +576,8 @@ def main():
     app = Application.builder().token(token).post_init(post_init).build()
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("model", cmd_model))
-    app.add_handler(CommandHandler("model_deepseek", cmd_model_deepseek))
-    app.add_handler(CommandHandler("model_mimo", cmd_model_mimo))
-    app.add_handler(CommandHandler("model_nemotron", cmd_model_nemotron))
-    app.add_handler(CommandHandler("model_north", cmd_model_north))
-    app.add_handler(CommandHandler("model_bigpickle", cmd_model_bigpickle))
     app.add_handler(CommandHandler("variant", cmd_variant))
-    app.add_handler(CommandHandler("variant_high", cmd_variant_high))
-    app.add_handler(CommandHandler("variant_max", cmd_variant_max))
-    app.add_handler(CommandHandler("variant_minimal", cmd_variant_minimal))
-    app.add_handler(CommandHandler("variant_none", cmd_variant_none))
     app.add_handler(CommandHandler("agent", cmd_agent))
-    app.add_handler(CommandHandler("agent_plan", cmd_agent_plan))
-    app.add_handler(CommandHandler("agent_build", cmd_agent_build))
-    app.add_handler(CommandHandler("agent_explore", cmd_agent_explore))
-    app.add_handler(CommandHandler("agent_general", cmd_agent_general))
-    app.add_handler(CommandHandler("agent_none", cmd_agent_none))
     app.add_handler(CommandHandler("session", cmd_session))
     app.add_handler(CommandHandler("continue_on", cmd_continue_on))
     app.add_handler(CommandHandler("continue_off", cmd_continue_off))
@@ -656,6 +598,7 @@ def main():
     app.add_handler(CommandHandler("github", cmd_github))
     app.add_handler(CommandHandler("debug", cmd_debug))
     app.add_handler(CommandHandler("config", cmd_config))
+    app.add_handler(CallbackQueryHandler(config_callbacks, pattern="^(mod_|var_|agt_)"))
     app.add_handler(CallbackQueryHandler(session_list_callback, pattern="^sl_"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat_handler))
     log.info("Assistant bot demarre...")

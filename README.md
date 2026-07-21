@@ -7,11 +7,11 @@ Interface Telegram complète pour [opencode](https://opencode.ai). Envoie un mes
 | Categorie | Commandes |
 |-----------|-----------|
 | **Chat** | Envoie un message → opencode répond |
-| **Modeles** | `/model`, `/model_deepseek`, `/model_mimo`, `/model_nemotron`, `/model_north`, `/model_bigpickle`, `/models` |
-| **Agents** | `/agent`, `/agent_plan`, `/agent_build`, `/agent_explore`, `/agent_general` |
-| **Variants** | `/variant`, `/variant_high`, `/variant_max`, `/variant_minimal` |
-| **Sessions** | `/continue_on`, `/continue_off`, `/session_new`, `/session_list`, `/fork`, `/export`, `/import` |
-| **Systeme** | `/config`, `/thinking`, `/stats`, `/version`, `/providers`, `/serve`, `/upgrade`, `/github`, `/debug` |
+| **Modeles** | `/model` — menu interactif avec boutons, choix du variant inclus |
+| **Agents** | `/agent` — menu interactif avec boutons |
+| **Variants** | `/variant` — menu interactif avec boutons |
+| **Sessions** | `/session` (navigation ◀ ▶), `/session_new`, `/fork`, `/export`, `/import` |
+| **Systeme** | `/config`, `/thinking`, `/models`, `/stats`, `/version`, `/providers`, `/serve`, `/upgrade`, `/github`, `/debug` |
 
 ## Installation
 
