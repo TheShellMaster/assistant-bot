@@ -1,0 +1,6 @@
+.env_assistant
+.env_bot
+.auth_ids.json
+__pycache__/
+*.pyc
+*.pyo
