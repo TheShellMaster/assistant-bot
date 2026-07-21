@@ -259,7 +259,8 @@ async def cmd_session(upd: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await upd.message.reply_text("Aucune session trouvee.")
             return
         ctx.user_data["session_list"] = sessions
-        await show_session_card(upd.message, ctx, 0)
+        msg = await upd.message.reply_text("Chargement...")
+        await show_session_card(msg, ctx, 0)
     elif action == "switch":
         if len(args) < 2:
             await upd.message.reply_text("Usage: /session switch <num>")
@@ -550,7 +551,8 @@ async def cmd_session_list(upd, ctx):
         await upd.message.reply_text("Aucune session trouvee.")
         return
     ctx.user_data["session_list"] = sessions
-    await show_session_card(upd.message, ctx, 0)
+    msg = await upd.message.reply_text("Chargement...")
+    await show_session_card(msg, ctx, 0)
 
 async def show_session_card(msg, ctx, idx):
     sessions = ctx.user_data.get("session_list", [])
