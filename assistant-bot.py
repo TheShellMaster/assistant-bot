@@ -71,7 +71,7 @@ def opencode_run(prompt, timeout=120):
 
     sid = cfg.get("session_id", "")
     if sid:
-        cmd.extend(["-s", sid, "--continue"])
+        cmd.extend(["-s", sid])
     elif cfg["continue_session"]:
         cmd.append("--continue")
 
