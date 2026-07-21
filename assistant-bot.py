@@ -384,7 +384,7 @@ async def cmd_session_list(upd, ctx):
 
 async def show_session_card(msg, ctx, idx):
     sessions = ctx.user_data.get("session_list", [])
-    if not sessions or idx < 0 or idx >= len(sessions):
+    if idx < 0 or idx >= len(sessions):
         return
     sid, title = sessions[idx]
     cfg = load_config()
@@ -392,36 +392,37 @@ async def show_session_card(msg, ctx, idx):
     kb = []
     row = []
     if idx > 0:
-        row.append(InlineKeyboardButton("◀", callback_data=f"sl_nav_{idx-1}"))
-    row.append(InlineKeyboardButton(f"{idx+1}/{len(sessions)}", callback_data="sl_noop"))
+        row.append(InlineKeyboardButton("◀ Precedent", callback_data=f"sl_nav_{idx-1}"))
     if idx < len(sessions) - 1:
-        row.append(InlineKeyboardButton("▶", callback_data=f"sl_nav_{idx+1}"))
-    kb.append(row)
+        row.append(InlineKeyboardButton("Suivant ▶", callback_data=f"sl_nav_{idx+1}"))
+    if row:
+        kb.append(row)
     kb.append([
-        InlineKeyboardButton("🗑 Supprimer", callback_data=f"sl_del_{idx}"),
-        InlineKeyboardButton("▶ Reprendre", callback_data=f"sl_sw_{idx}"),
+        InlineKeyboardButton("🗑 Supprimer", callback_data=f"sl_delete_{idx}"),
+        InlineKeyboardButton("▶ Reprendre", callback_data=f"sl_switch_{idx}"),
     ])
     marker = " ◀ Active" if sid == active else ""
-    card = f"**Session {idx+1}/{len(sessions)}**{marker}\n\n`{title[:200]}`\n\nID: `{sid}`"
+    card = (
+        f"**Session {idx+1}/{len(sessions)}**{marker}\n\n"
+        f"`{title[:200]}`\n\n"
+        f"ID: `{sid}`"
+    )
     await msg.edit_text(card, reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
 
 async def session_list_callback(upd, ctx):
     q = upd.callback_query
     await q.answer()
     data = q.data
-    if data == "sl_noop":
-        return
-    parts = data.split("_", 2)
-    action = parts[1]
-    idx = int(parts[2])
+    idx = int(data.split("_")[-1])
     sessions = ctx.user_data.get("session_list", [])
-    if not sessions or idx < 0 or idx >= len(sessions):
+    if idx < 0 or idx >= len(sessions):
         return
     sid, title = sessions[idx]
-    if action == "nav":
+    if data.startswith("sl_nav"):
         await show_session_card(q.message, ctx, idx)
-    elif action == "del":
-        run(f"opencode session delete {sid}", timeout=15)
+    elif data.startswith("sl_delete"):
+        result = run(f"opencode session delete {sid}", timeout=15)
+        cleaned = strip_ansi(result) if result else "Supprimee"
         del sessions[idx]
         ctx.user_data["session_list"] = sessions
         if not sessions:
@@ -429,7 +430,7 @@ async def session_list_callback(upd, ctx):
             return
         new_idx = min(idx, len(sessions) - 1)
         await show_session_card(q.message, ctx, new_idx)
-    elif action == "sw":
+    elif data.startswith("sl_switch"):
         cfg = load_config()
         cfg["session_id"] = sid
         cfg["continue_session"] = True
