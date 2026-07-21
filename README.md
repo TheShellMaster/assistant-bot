@@ -1,152 +1,77 @@
-# Assistant Bot — opencode via Telegram
+<div align="center">
+  <img src="https://img.shields.io/badge/Python-3.8+-blue.svg" alt="Python Version" />
+  <img src="https://img.shields.io/badge/opencode-Ready-success.svg" alt="opencode Integration" />
+  <img src="https://img.shields.io/badge/Telegram-Bot-blue.svg" alt="Telegram Bot" />
+  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License MIT" />
+</div>
 
-Interface Telegram complète pour [opencode](https://opencode.ai). Envoie un message, opencode répond. Change de modèle, d'agent, de session — tout depuis Telegram.
+# 🚀 Assistant Bot — opencode via Telegram
 
-## Fonctionnalités
+Une interface Telegram complète, interactive et ultra-stable pour [opencode](https://opencode.ai). Développée en Python, elle permet de contrôler entièrement vos sessions de développement IA depuis votre téléphone ou votre bureau, avec une gestion robuste des processus système (venv, systemd).
 
-| Categorie | Commandes |
-|-----------|-----------|
-| **Chat** | Envoie un message → opencode répond |
-| **Modeles** | `/model` — menu interactif avec boutons, choix du variant inclus |
-| **Agents** | `/agent` — menu interactif avec boutons |
-| **Variants** | `/variant` — menu interactif avec boutons |
-| **Sessions** | `/session` (navigation ◀ ▶), `/session_new`, `/fork`, `/export`, `/import` |
-| **Systeme** | `/config`, `/thinking`, `/models`, `/stats`, `/version`, `/providers`, `/serve`, `/upgrade`, `/github`, `/debug` |
+## ✨ Fonctionnalités Actuelles (v2.1)
 
-## Installation
+Le bot a été entièrement réécrit pour offrir une stabilité maximale, sans crash, même avec de gros messages ou des requêtes intensives.
+
+| Catégorie | Commandes / Explications |
+|-----------|-------------------------|
+| **Contrôle** | `/start` — Démarrer le bot.<br>`/opencode_start` — Démarrer le serveur API opencode.<br>`/opencode_stop` — Stopper le serveur API opencode. |
+| **Sécurité** | `/permissions` — Gérer l'approbation des commandes bash : Demander, Autoriser tout, Bloquer tout. |
+| **Modèles** | `/models` — Sélectionner le modèle IA via un menu interactif (Deepseek, Nemotron, etc.). |
+| **Sessions** | `/session` — Gérer vos conversations (Reprendre ou Supprimer).<br>`/new` — Démarrer une nouvelle session fraîche. |
+| **Système** | `/version` — Version actuelle d'opencode.<br>`/stats` — Statistiques d'utilisation.<br>`/upgrade` — Mettre à jour opencode.<br>`/config` — Afficher la configuration. |
+
+## 🔮 Nouveautés à Venir (Roadmap)
+
+Nous travaillons actuellement sur les prochaines grosses fonctionnalités qui seront bientôt intégrées au bot :
+
+- **`/mcp`** : Intégration des serveurs MCP (Model Context Protocol).
+- **`/fork`** : Dupliquer une session en cours pour explorer une autre idée sans perdre l'originale.
+- **`/export` & `/import`** : Sauvegarder et restaurer vos sessions de développement.
+- **`/find` & `/read`** : Navigation avancée dans les fichiers locaux.
+- **`/vcs`** : Intégration des contrôles Git (commit, diff, etc.) directement depuis Telegram.
+
+## ⚙️ Installation "Tout en un" (Serveur Linux / AWS)
+
+Le script d'installation a été optimisé pour s'intégrer proprement sur les systèmes Linux modernes (Debian, Ubuntu, AWS) via un environnement virtuel (`venv`) respectant la norme PEP 668.
 
 ```bash
-# 1. Cloner et installer
-git clone <url-du-projet>
+# 1. Cloner le projet
+git clone https://github.com/TheShellMaster/assistant-bot.git
 cd assistant-bot
+
+# 2. Rendre le script exécutable
 chmod +x install.sh
+
+# 3. Lancer l'installation automatisée
 sudo ./install.sh
 ```
 
-Le script installe automatiquement :
-- opencode (via le script officiel)
-- Les dépendances Python (python-telegram-bot)
-- Configure le token Telegram
-- Met en place le service systemd
+Le script s'occupe de :
+- Vérifier / Installer **opencode**.
+- Créer un **environnement virtuel Python** (`venv`).
+- Installer les dépendances (`python-telegram-bot`, `requests`).
+- Demander et configurer votre **Token Telegram**.
+- Créer et démarrer le **service systemd** (`assistant-bot.service`).
 
-### Installation manuelle
+## 🛠 Commandes utiles du serveur
 
-```bash
-# Dependances
-pip install -r requirements.txt
-
-# Token Telegram
-echo "TELEGRAM_BOT_TOKEN=votre_token_ici" > .env_assistant
-
-# Lancer
-python3 assistant-bot.py
-```
-
-### Service systemd
+Une fois installé, le bot tourne silencieusement en arrière-plan.
 
 ```bash
-sudo tee /etc/systemd/system/assistant-bot.service <<EOF
-[Unit]
-Description=Assistant Bot Telegram (opencode)
-After=network.target
+# Voir les logs en direct (très utile pour le débogage) :
+sudo journalctl -u assistant-bot.service -f
 
-[Service]
-Type=simple
-User=$(whoami)
-WorkingDirectory=$(pwd)
-ExecStart=/usr/bin/python3 $(pwd)/assistant-bot.py
-Restart=always
-RestartSec=10
-EnvironmentFile=$(pwd)/.env_assistant
+# Arrêter le bot :
+sudo systemctl stop assistant-bot.service
 
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable --now assistant-bot
+# Redémarrer le bot :
+sudo systemctl restart assistant-bot.service
 ```
 
-## Modeles disponibles
-
-| Commande | Modele |
-|----------|--------|
-| `/model_deepseek` | `opencode/deepseek-v4-flash-free` |
-| `/model_mimo` | `opencode/mimo-v2.5-free` |
-| `/model_nemotron` | `opencode/nemotron-3-ultra-free` |
-| `/model_north` | `opencode/north-mini-code-free` |
-| `/model_bigpickle` | `opencode/big-pickle` |
-
-## Agents opencode
-
-| Commande | Agent | Usage |
-|----------|-------|-------|
-| `/agent_plan` | `plan` | Planifie, ne modifie rien |
-| `/agent_build` | `build` | Developpement complet |
-| `/agent_explore` | `explore` | Lecture seule, exploration |
-| `/agent_general` | `general` | Agent general |
-| `/agent_none` | (defaut) | Comportement standard |
-
-## Variants (effort de raisonnement)
-
-| Commande | Effet |
-|----------|-------|
-| `/variant_high` | Raisonnement eleve |
-| `/variant_max` | Raisonnement maximum |
-| `/variant_minimal` | Raisonnement minimal |
-| `/variant_none` | Par defaut |
-
-## Gestion des sessions
-
-| Commande | Action |
-|----------|--------|
-| `/continue_on` | Active la session continue (conserve le contexte) |
-| `/continue_off` | Nouvelle session a chaque message |
-| `/session_new` | Cree une nouvelle session fraiche |
-| `/session_list` | Navigue dans les sessions avec boutons ◀ ▶ |
-| `/session_switch <num>` | Changer de session par numero |
-| `/session_delete <num>` | Supprimer une session par numero |
-| `/fork` | Fork la session en cours |
-| `/export` | Exporte la session en cours en JSON |
-| `/import <fichier/url>` | Importe une session depuis un fichier JSON |
-
-## Commandes systeme
-
-| Commande | Action |
-|----------|--------|
-| `/config` | Affiche la configuration actuelle |
-| `/thinking` | Active/desactive l'affichage du raisonnement |
-| `/models` | Liste tous les modeles disponibles |
-| `/version` | Affiche la version d'opencode |
-| `/providers` | Liste les fournisseurs AI configures |
-| `/stats` | Statistiques d'utilisation (7 jours) |
-| `/upgrade` | Met a jour opencode |
-| `/serve` | Demarre le serveur headless opencode |
-| `/github` | Integration GitHub |
-| `/debug` | Outils de debug opencode |
-
-## Obtenir un token Telegram
+## 🔑 Obtenir un token Telegram
 
 1. Ouvre Telegram et cherche [@BotFather](https://t.me/BotFather)
 2. Envoie `/newbot`
-3. Choisis un nom (ex: `Mon Assistant`)
-4. Choisis un username (ex: `mon_assistant_bot`)
-5. Copie le token et colle-le dans l'installateur
-
-## Dependances
-
-- Python 3.8+
-- [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot) >= 22
-- [opencode](https://opencode.ai) >= 1.18
-
-## Structure du projet
-
-```
-assistant-bot/
-├── assistant-bot.py    # Bot Telegram principal
-├── install.sh          # Script d'installation complet
-├── requirements.txt    # Dependances Python
-├── README.md           # Ce fichier
-├── .gitignore          # Fichiers ignores par git
-└── .env_assistant      # Token Telegram (genere par install.sh)
-```
+3. Choisis un nom et un `@username`
+4. Copie le token reçu et donne-le à l'installateur !
