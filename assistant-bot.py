@@ -205,7 +205,9 @@ async def cmd_session(upd: Update, ctx: ContextTypes.DEFAULT_TYPE):
             "/continue_on - Activer session continue\n"
             "/continue_off - Desactiver\n"
             "/session_new - Nouvelle session\n"
-            "/session_list - Lister les sessions"
+            "/session_list - Lister les sessions\n"
+            "/session_switch <id> - Changer de session\n"
+            "/session_delete <id> - Supprimer une session"
         )
         return
     action = args[0].lower()
@@ -387,6 +389,8 @@ async def post_init(app: Application):
         BotCommand("continue_off", "Desactiver session continue"),
         BotCommand("session_new", "Nouvelle session"),
         BotCommand("session_list", "Lister les sessions"),
+        BotCommand("session_switch", "Changer de session"),
+        BotCommand("session_delete", "Supprimer une session"),
         BotCommand("thinking", "Afficher le raisonnement"),
         BotCommand("config", "Voir la configuration"),
         BotCommand("models", "Lister tous les modeles"),
@@ -459,12 +463,43 @@ async def cmd_continue_off(upd, ctx):
 
 async def cmd_session_new(upd, ctx):
     cfg = load_config()
-    cfg["continue_session"] = False
+    cfg["continue_session"] = True
     cfg["session_id"] = ""
     save_config(cfg)
     await upd.message.reply_text("Nouvelle session fraiche au prochain message.")
+
+async def cmd_session_switch(upd, ctx):
+    args = ctx.args
+    if not args:
+        await upd.message.reply_text("Usage: /session_switch <id>")
+        return
+    cfg = load_config()
+    cfg["session_id"] = args[0]
     cfg["continue_session"] = True
     save_config(cfg)
+    await upd.message.reply_text(f"Session changee: {args[0]}")
+
+async def cmd_session_delete(upd, ctx):
+    args = ctx.args
+    if not args:
+        cfg = load_config()
+        sid = cfg.get("session_id", "")
+        cmd = f"opencode session delete {sid}" if sid else None
+        if not sid:
+            await upd.message.reply_text("Aucune session active. Usage: /session_delete <id>")
+            return
+        await upd.message.reply_text(f"Suppression de la session active: {sid}...")
+    else:
+        sid = args[0]
+        cmd = f"opencode session delete {sid}"
+        await upd.message.reply_text(f"Suppression de la session {sid}...")
+    result = run_shell(cmd, timeout=15)
+    cleaned = strip_ansi(result) if result else "Supprimee"
+    cfg = load_config()
+    if cfg.get("session_id") == sid:
+        cfg["session_id"] = ""
+        save_config(cfg)
+    await upd.message.reply_text(f"Session {sid}: {cleaned}")
 
 async def cmd_session_list(upd, ctx):
     raw = run_shell("opencode session list 2>&1")
@@ -500,6 +535,8 @@ def main():
     app.add_handler(CommandHandler("continue_off", cmd_continue_off))
     app.add_handler(CommandHandler("session_new", cmd_session_new))
     app.add_handler(CommandHandler("session_list", cmd_session_list))
+    app.add_handler(CommandHandler("session_switch", cmd_session_switch))
+    app.add_handler(CommandHandler("session_delete", cmd_session_delete))
     app.add_handler(CommandHandler("thinking", cmd_thinking))
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("export", cmd_export))

@@ -104,6 +104,8 @@ sudo systemctl enable --now assistant-bot
 | `/continue_off` | Nouvelle session a chaque message |
 | `/session_new` | Cree une nouvelle session fraiche |
 | `/session_list` | Liste toutes les sessions existantes |
+| `/session_switch <id>` | Changer de session active |
+| `/session_delete <id>` | Supprimer une session |
 | `/fork` | Fork la session en cours |
 | `/export` | Exporte la session en cours en JSON |
 | `/import <fichier/url>` | Importe une session depuis un fichier JSON |
