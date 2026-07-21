@@ -1,8 +1,8 @@
 import os, re, json, logging, subprocess
 from pathlib import Path
 
-from telegram import Update, BotCommand
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, BotCommand, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
 logging.basicConfig(level=logging.INFO, style="{", format="{asctime} [{levelname}] {message}")
 log = logging.getLogger(__name__)
@@ -231,7 +231,7 @@ async def cmd_session(upd: Update, ctx: ContextTypes.DEFAULT_TYPE):
             "/continue_on - Activer session continue\n"
             "/continue_off - Desactiver\n"
             "/session_new - Nouvelle session\n"
-            "/session_list - Lister les sessions\n"
+            "/session_list - Naviguer avec boutons ◀ ▶\n"
             "/session_switch <num> - Changer de session\n"
             "/session_delete <num> - Supprimer une session"
         )
@@ -258,13 +258,8 @@ async def cmd_session(upd: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if not sessions:
             await upd.message.reply_text("Aucune session trouvee.")
             return
-        lines = ["Sessions:\n"]
-        active = cfg.get("session_id", "")
-        for i, (sid, title) in enumerate(sessions, 1):
-            marker = " ◀" if sid == active else ""
-            t = title[:50] if len(title) > 50 else title
-            lines.append(f"{i}. [{sid[:12]}…] {t}{marker}")
-        await upd.message.reply_text("\n".join(lines)[:4000])
+        ctx.user_data["session_list"] = sessions
+        await show_session_card(upd.message, ctx, 0)
     elif action == "switch":
         if len(args) < 2:
             await upd.message.reply_text("Usage: /session switch <num>")
@@ -549,9 +544,71 @@ async def cmd_session_delete(upd, ctx):
     await upd.message.reply_text(f"Session: {cleaned[:1000]}")
 
 async def cmd_session_list(upd, ctx):
-    raw = run_shell("opencode session list 2>&1")
-    cleaned = strip_ansi(raw) if raw else "Aucune session trouvee."
-    await upd.message.reply_text(f"Sessions:\n\n{cleaned[:3500]}")
+    raw = run_shell("opencode session list 2>&1", timeout=10)
+    sessions = parse_sessions(raw)
+    if not sessions:
+        await upd.message.reply_text("Aucune session trouvee.")
+        return
+    ctx.user_data["session_list"] = sessions
+    await show_session_card(upd.message, ctx, 0)
+
+async def show_session_card(msg, ctx, idx):
+    sessions = ctx.user_data.get("session_list", [])
+    if idx < 0 or idx >= len(sessions):
+        return
+    sid, title = sessions[idx]
+    cfg = load_config()
+    active = cfg.get("session_id", "")
+    kb = []
+    row = []
+    if idx > 0:
+        row.append(InlineKeyboardButton("◀ Precedent", callback_data=f"sl_nav_{idx-1}"))
+    if idx < len(sessions) - 1:
+        row.append(InlineKeyboardButton("Suivant ▶", callback_data=f"sl_nav_{idx+1}"))
+    if row:
+        kb.append(row)
+    kb.append([
+        InlineKeyboardButton("🗑 Supprimer", callback_data=f"sl_delete_{idx}"),
+        InlineKeyboardButton("▶ Reprendre", callback_data=f"sl_switch_{idx}"),
+    ])
+    marker = " ◀ Active" if sid == active else ""
+    card = (
+        f"**Session {idx+1}/{len(sessions)}**{marker}\n\n"
+        f"`{title[:200]}`\n\n"
+        f"ID: `{sid}`"
+    )
+    await msg.edit_text(card, reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
+
+async def session_list_callback(upd, ctx):
+    q = upd.callback_query
+    await q.answer()
+    data = q.data
+    idx = int(data.split("_")[-1])
+    sessions = ctx.user_data.get("session_list", [])
+    if idx < 0 or idx >= len(sessions):
+        return
+    sid, title = sessions[idx]
+    if data.startswith("sl_nav"):
+        await show_session_card(q.message, ctx, idx)
+    elif data.startswith("sl_delete"):
+        result = run_shell(f"opencode session delete {sid}", timeout=15)
+        cleaned = strip_ansi(result) if result else "Supprimee"
+        del sessions[idx]
+        ctx.user_data["session_list"] = sessions
+        if not sessions:
+            await q.message.edit_text("Toutes les sessions supprimees.", reply_markup=None)
+            return
+        new_idx = min(idx, len(sessions) - 1)
+        await show_session_card(q.message, ctx, new_idx)
+    elif data.startswith("sl_switch"):
+        cfg = load_config()
+        cfg["session_id"] = sid
+        cfg["continue_session"] = True
+        save_config(cfg)
+        await q.message.edit_text(
+            f"✅ Session reprise :\n\n`{title[:200]}`\n\nID: `{sid}`",
+            parse_mode="Markdown"
+        )
 
 def main():
     token = get_token()
@@ -597,6 +654,7 @@ def main():
     app.add_handler(CommandHandler("github", cmd_github))
     app.add_handler(CommandHandler("debug", cmd_debug))
     app.add_handler(CommandHandler("config", cmd_config))
+    app.add_handler(CallbackQueryHandler(session_list_callback, pattern="^sl_"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat_handler))
     log.info("Assistant bot demarre...")
     app.run_polling()

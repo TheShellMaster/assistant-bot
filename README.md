@@ -103,9 +103,9 @@ sudo systemctl enable --now assistant-bot
 | `/continue_on` | Active la session continue (conserve le contexte) |
 | `/continue_off` | Nouvelle session a chaque message |
 | `/session_new` | Cree une nouvelle session fraiche |
-| `/session_list` | Liste toutes les sessions existantes |
-| `/session_switch <id>` | Changer de session active |
-| `/session_delete <id>` | Supprimer une session |
+| `/session_list` | Navigue dans les sessions avec boutons ◀ ▶ |
+| `/session_switch <num>` | Changer de session par numero |
+| `/session_delete <num>` | Supprimer une session par numero |
 | `/fork` | Fork la session en cours |
 | `/export` | Exporte la session en cours en JSON |
 | `/import <fichier/url>` | Importe une session depuis un fichier JSON |
