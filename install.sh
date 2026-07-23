@@ -66,7 +66,27 @@ else
     ok "Fichier de token existant : $ENV_FILE"
 fi
 
-# ---- 4. Service systemd ----
+# ---- 4. Admin Telegram ----
+CURRENT_ADMIN=$(grep "^ADMIN_CHAT_ID=" "$ENV_FILE" 2>/dev/null | cut -d= -f2 || true)
+if [ -z "$CURRENT_ADMIN" ]; then
+    echo ""
+    warn "=== Configuration de l'administrateur ==="
+    echo "Pour restreindre l'accès au bot, entre ton identifiant Telegram (admin)."
+    echo "Tu peux l'obtenir en écrivant à @userinfobot ou @getmyid_bot."
+    echo "Laisse vide pour que le bot soit public (tout le monde peut l'utiliser)."
+    echo ""
+    read -rp "ID Telegram admin : " ADMIN_ID
+    if [ -n "$ADMIN_ID" ]; then
+        echo "ADMIN_CHAT_ID=$ADMIN_ID" >> "$ENV_FILE"
+        ok "Admin ID enregistré."
+    else
+        warn "Aucun ID admin — le bot sera public. Tu pourras ajouter ADMIN_CHAT_ID plus tard dans $ENV_FILE"
+    fi
+else
+    ok "Admin ID déjà configuré : $CURRENT_ADMIN"
+fi
+
+# ---- 5. Service systemd ----
 info "Installation du service systemd..."
 sudo tee "$SERVICE_FILE" >/dev/null << EOF
 [Unit]
@@ -97,7 +117,7 @@ else
     warn "Le service n'a pas démarré. Vérifie: sudo journalctl -u $SERVICE_NAME -n 20"
 fi
 
-# ---- 5. Résumé ----
+# ---- 6. Résumé ----
 echo ""
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}  Assistant Bot installé avec succès !${NC}"

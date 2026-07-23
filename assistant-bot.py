@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import os
+import secrets
 import subprocess
 import threading
 import time
@@ -43,7 +44,8 @@ log = logging.getLogger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 # Chemins & constantes
 # ─────────────────────────────────────────────────────────────────────────────
-ENV_FILE      = Path(__file__).parent.resolve() / ".env_bot"
+BASE_DIR      = Path(__file__).parent.resolve()
+ENV_FILE      = BASE_DIR / ".env_bot"
 CONFIG_FILE   = Path.home() / ".assistant_config.json"
 OPENCODE_PORT = 4097
 BASE_URL      = f"http://127.0.0.1:{OPENCODE_PORT}"
@@ -57,8 +59,9 @@ FREE_MODELS = {
     "laguna":    ("opencode", "laguna-s-2.1-free"),
 }
 
-AGENTS   = ["build", "plan", "explore", "general"]
-VARIANTS = {"Défaut": "", "high": "high", "max": "max", "minimal": "minimal"}
+AGENTS    = ["build", "plan", "explore", "general"]
+VARIANTS  = {"Défaut": "", "high": "high", "max": "max", "minimal": "minimal"}
+ADMIN_LINK = "t.me/King_premium_N5"
 
 DEFAULT_CONFIG = {
     "model_provider":   "opencode",
@@ -68,6 +71,55 @@ DEFAULT_CONFIG = {
     "continue_session": True,
     "session_id":       "",
 }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Authentification (admin + invités)
+# ─────────────────────────────────────────────────────────────────────────────
+AUTH_CODES_FILE = BASE_DIR / ".auth_codes.json"
+AUTHORIZED_FILE = BASE_DIR / ".authorized_ids.json"
+
+auth_codes = {}
+authorized_ids = set()
+if AUTH_CODES_FILE.exists():
+    auth_codes = json.loads(AUTH_CODES_FILE.read_text())
+if AUTHORIZED_FILE.exists():
+    authorized_ids = set(json.loads(AUTHORIZED_FILE.read_text()))
+
+def _save_codes():
+    AUTH_CODES_FILE.write_text(json.dumps(auth_codes))
+
+def _save_auth():
+    AUTHORIZED_FILE.write_text(json.dumps(list(authorized_ids)))
+
+def _get_admin():
+    v = os.getenv("ADMIN_CHAT_ID")
+    if v: return v.strip()
+    if ENV_FILE.exists():
+        for line in ENV_FILE.read_text().strip().splitlines():
+            if "=" in line:
+                k, v = line.split("=", 1)
+                if k.strip() == "ADMIN_CHAT_ID":
+                    return v.strip().strip("\"'")
+    return None
+
+def is_admin(cid):
+    a = _get_admin()
+    return a is not None and str(cid) == a
+
+def is_authorized(cid):
+    return is_admin(cid) or cid in authorized_ids
+
+async def _req_admin(upd):
+    if not is_admin(upd.effective_chat.id):
+        await upd.message.reply_text(f"\u26d4 Reserve a l'admin.\nAdmin : {ADMIN_LINK}")
+        return False
+    return True
+
+async def _req_auth(upd):
+    if not is_authorized(upd.effective_chat.id):
+        await upd.message.reply_text(f"\u26d4 Acces refuse. Contacte l'admin : {ADMIN_LINK}\nou utilise /auth CODE.")
+        return False
+    return True
 
 # ─────────────────────────────────────────────────────────────────────────────
 # État global
@@ -395,35 +447,102 @@ class SessionPoller:
 # Handlers Telegram
 # ─────────────────────────────────────────────────────────────────────────────
 async def cmd_start(upd: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    cid = upd.effective_chat.id
+    if not is_authorized(cid):
+        await upd.message.reply_text(
+            "🤖 <b>Assistant Opencode</b>\n\n"
+            "⛔ <b>Accès refusé</b>\n"
+            f"Ce bot est privé. Contacte l'admin : {ADMIN_LINK}\n\n"
+            "Utilise <code>/auth VOTRE_CODE</code> pour te connecter.",
+            parse_mode="HTML"
+        )
+        return
+    if is_admin(cid):
+        await _cmd_start_admin(upd, ctx)
+    else:
+        await _cmd_start_guest(upd, ctx)
+
+async def _cmd_start_admin(upd: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     cfg = load_config()
     srv = "🟢 Allumé" if _is_server_alive() else "🔴 Éteint"
+    var_name = next((k for k, v in VARIANTS.items() if v == cfg.get("variant", "")), cfg.get("variant", "défaut"))
     text = (
         f"🤖 <b>Assistant Opencode</b>\n\n"
         f"Serveur  : {srv}\n"
         f"Modèle   : <code>{cfg['model_provider']}/{cfg['model_id']}</code>\n"
-        f"Agent    : <code>{cfg.get('agent') or 'défaut'}</code>\n\n"
-        "Envoie simplement un message pour parler à opencode.\n\n"
+        f"Variante : <code>{var_name}</code>\n\n"
         "<b>Contrôle :</b>\n"
         "/opencode_start – allumer opencode\n"
         "/opencode_stop – éteindre opencode\n"
-        "/permissions – gérer le mode d'autorisation bash\n"
+        "/permissions – mode permission bash\n"
         "/models – changer de modèle\n"
         "/session – gérer les sessions\n"
         "/new – nouvelle session\n"
-        "/abort – annuler la réflexion\n"
+        "/abort – annuler\n\n"
+        "<b>Admin :</b>\n"
+        "/grant – créer un code invité\n\n"
+        "Envoie un message pour parler à l'IA."
+    )
+    await upd.message.reply_text(text, parse_mode="HTML")
+
+async def _cmd_start_guest(upd: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    cfg = load_config()
+    srv = "🟢 Allumé" if _is_server_alive() else "🔴 Éteint"
+    text = (
+        f"🤖 <b>Assistant Opencode</b>\n\n"
+        f"Serveur  : {srv}\n\n"
+        "Envoie un message pour parler à l'IA.\n\n"
+        "/version – version opencode\n"
+        "/stats – statistiques"
     )
     await upd.message.reply_text(text, parse_mode="HTML")
 
 async def cmd_opencode_start(upd: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _req_admin(upd): return
     msg = await upd.message.reply_text("⏳ Démarrage opencode…")
     ok = start_opencode()
     await msg.edit_text("🟢 opencode est allumé et prêt." if ok else "❌ Échec du démarrage.")
 
 async def cmd_opencode_stop(upd: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _req_admin(upd): return
     stop_opencode()
     await upd.message.reply_text("🔴 opencode est éteint. (Il ne se rallumera plus tout seul).")
 
+async def cmd_grant(upd: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _req_admin(upd): return
+    code = secrets.token_hex(4)
+    auth_codes[code] = str(upd.effective_chat.id)
+    _save_codes()
+    admin_link = os.getenv("ADMIN_LINK", "")
+    msg = f"🔑 Code invité : <code>{code}</code>\n\nLe destinataire utilise <code>/auth {code}</code>"
+    if admin_link:
+        msg += f"\nAdmin : {admin_link}"
+    await upd.message.reply_text(msg, parse_mode="HTML")
+
+async def cmd_auth(upd: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    cid = upd.effective_chat.id
+    if is_admin(cid):
+        await upd.message.reply_text("✅ Tu es l'admin, aucun code requis.")
+        return
+    if cid in authorized_ids:
+        await upd.message.reply_text("✅ Tu es déjà autorisé.")
+        return
+    parts = ctx.args or []
+    if not parts:
+        await upd.message.reply_text("Utilisation : /auth CODE")
+        return
+    code = parts[0].strip()
+    if code in auth_codes:
+        authorized_ids.add(cid)
+        _save_auth()
+        del auth_codes[code]
+        _save_codes()
+        await upd.message.reply_text("✅ Accès accordé ! Envoie /start pour commencer.")
+    else:
+        await upd.message.reply_text(f"❌ Code invalide ou déjà utilisé.\nContacte l'admin : {ADMIN_LINK}")
+
 async def cmd_permissions(upd: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _req_admin(upd): return
     mode = "ask"
     try:
         cfg_path = Path.home() / ".config" / "opencode" / "opencode.json"
@@ -439,11 +558,14 @@ async def cmd_permissions(upd: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await upd.message.reply_text(f"🔐 <b>Permission bash</b>\nActuel : <b>{mode}</b>\n\nChoisis le comportement :", parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb))
 
 async def cmd_models(upd: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _req_admin(upd): return
     cfg = load_config()
     cur = f"{cfg['model_provider']}/{cfg['model_id']}"
+    cur_var = cfg.get("variant", "")
+    var_name = next((k for k, v in VARIANTS.items() if v == cur_var), "défaut")
     kb = [[InlineKeyboardButton(f"{k}" + (" ✓" if f"{p}/{m}" == cur else ""), callback_data=f"mod_{k}")] for k, (p, m) in FREE_MODELS.items()]
     kb.append([InlineKeyboardButton("❌ Fermer", callback_data="close_msg")])
-    await upd.message.reply_text("Sélectionne le modèle :", reply_markup=InlineKeyboardMarkup(kb))
+    await upd.message.reply_text(f"Sélectionne le modèle :\nVariante actuelle : <b>{var_name}</b>", parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb))
 
 def _build_session_list_ui() -> tuple[str, list]:
     sessions = list_sessions()
@@ -460,16 +582,19 @@ def _build_session_list_ui() -> tuple[str, list]:
     return "📋 <b>Sessions</b>\n\n" + "\n".join(lines), kb
 
 async def cmd_session(upd: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _req_admin(upd): return
     text, kb = _build_session_list_ui()
     await upd.message.reply_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb) if kb else None)
 
 async def cmd_new(upd: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _req_admin(upd): return
     sid = get_or_create_session()
     if sid in active_pollers: active_pollers.pop(sid).stop()
     _create_session()
     await upd.message.reply_text("✅ Nouvelle session propre démarrée.")
 
 async def cmd_abort(upd: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _req_admin(upd): return
     sid = load_config().get("session_id", "")
     if sid in active_pollers: active_pollers.pop(sid).stop()
     if sid:
@@ -492,6 +617,7 @@ async def cmd_stats(upd: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await upd.message.reply_text(f"❌ Erreur : {e}")
 
 async def cmd_upgrade(upd: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _req_admin(upd): return
     msg = await upd.message.reply_text("⏳ Mise à jour opencode…")
     stop_opencode()
     try:
@@ -504,6 +630,7 @@ async def cmd_upgrade(upd: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await msg.edit_text(f"❌ Erreur : {e}")
 
 async def cmd_config(upd: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _req_admin(upd): return
     try:
         r = _api("GET", "/global/config")
         if r.status_code == 200:
@@ -519,6 +646,10 @@ async def cmd_config(upd: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await upd.message.reply_text("Fichier config introuvable.")
 
 async def message_handler(upd: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    cid = upd.effective_chat.id
+    if not is_authorized(cid):
+        await upd.message.reply_text(f"⛔ Accès refusé. Contacte l'admin : {ADMIN_LINK}\nou utilise /auth CODE.")
+        return
     text = upd.message.text.strip()
     
     if not ensure_opencode():
@@ -550,6 +681,9 @@ async def callback_handler(upd: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     if data.startswith("perm_mode_"):
+        if not is_admin(q.from_user.id):
+            await q.message.edit_text("⛔ Réservé à l'admin.")
+            return
         mode = data[10:]
         ok = _set_opencode_bash_mode(mode)
         await q.message.edit_text(f"✅ Mode <b>{mode}</b> activé." if ok else "❌ Erreur de configuration.", parse_mode="HTML")
@@ -563,10 +697,49 @@ async def callback_handler(upd: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     if data.startswith("mod_"):
-        prov, mid = FREE_MODELS[data[4:]]
-        cfg = load_config(); cfg["model_provider"] = prov; cfg["model_id"] = mid; save_config(cfg)
-        await q.message.edit_text(f"✅ Modèle : <code>{prov}/{mid}</code>", parse_mode="HTML")
+        if not is_admin(q.from_user.id):
+            await q.message.edit_text("⛔ Réservé à l'admin.")
+            return
+        key = data[4:]
+        if key not in FREE_MODELS:
+            await q.message.edit_text("❌ Modèle inconnu.")
+            return
+        prov, mid = FREE_MODELS[key]
+        ctx.user_data['sel_model'] = key
+        cur_var = load_config().get("variant", "")
+        kb = [[InlineKeyboardButton(f"{k}" + (" ✓" if v == cur_var else ""), callback_data=f"var_{v}")] for k, v in VARIANTS.items()]
+        kb.append([InlineKeyboardButton("⬅️ Retour", callback_data="mod_back")])
+        await q.message.edit_text(f"Sélectionne la variante pour <b>{key}</b> :", parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb))
         return
+
+    if data.startswith("var_"):
+        if not is_admin(q.from_user.id):
+            await q.message.edit_text("⛔ Réservé à l'admin.")
+            return
+        variant = data[4:]
+        key = ctx.user_data.get('sel_model')
+        if not key or key not in FREE_MODELS:
+            await q.message.edit_text("❌ Modèle non sélectionné.")
+            return
+        prov, mid = FREE_MODELS[key]
+        cfg = load_config(); cfg["model_provider"] = prov; cfg["model_id"] = mid; cfg["variant"] = variant; save_config(cfg)
+        var_name = next((k for k, v in VARIANTS.items() if v == variant), variant or "Défaut")
+        await q.message.edit_text(f"✅ Modèle : <code>{prov}/{mid}</code> ({var_name})", parse_mode="HTML")
+        return
+
+    if data == "mod_back":
+        if not is_admin(q.from_user.id): return
+        cfg = load_config()
+        cur = f"{cfg['model_provider']}/{cfg['model_id']}"
+        kb = [[InlineKeyboardButton(f"{k}" + (" ✓" if f"{p}/{m}" == cur else ""), callback_data=f"mod_{k}")] for k, (p, m) in FREE_MODELS.items()]
+        kb.append([InlineKeyboardButton("❌ Fermer", callback_data="close_msg")])
+        await q.message.edit_text("Sélectionne le modèle :", reply_markup=InlineKeyboardMarkup(kb))
+        return
+
+    if data.startswith("ses_switch_") or data.startswith("ses_delete_"):
+        if not is_admin(q.from_user.id):
+            await q.message.edit_text("⛔ Réservé à l'admin.")
+            return
 
     if data.startswith("ses_switch_"):
         prefix = data[11:]
@@ -618,6 +791,8 @@ async def post_init(app: Application) -> None:
         BotCommand("stats",          "Statistiques opencode"),
         BotCommand("upgrade",        "Mettre à jour opencode"),
         BotCommand("config",         "Afficher la configuration"),
+        BotCommand("grant",          "Créer un code invité"),
+        BotCommand("auth",           "S'authentifier avec un code"),
     ])
     log.info("Assistant bot prêt.")
 
@@ -643,6 +818,8 @@ def main() -> None:
     app.add_handler(CommandHandler("stats",          cmd_stats))
     app.add_handler(CommandHandler("upgrade",        cmd_upgrade))
     app.add_handler(CommandHandler("config",         cmd_config))
+    app.add_handler(CommandHandler("grant",          cmd_grant))
+    app.add_handler(CommandHandler("auth",           cmd_auth))
     app.add_handler(CallbackQueryHandler(callback_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
     

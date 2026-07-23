@@ -9,17 +9,27 @@
 
 Une interface Telegram complète, interactive et ultra-stable pour [opencode](https://opencode.ai). Développée en Python, elle permet de contrôler entièrement vos sessions de développement IA depuis votre téléphone ou votre bureau, avec une gestion robuste des processus système (venv, systemd).
 
-## ✨ Fonctionnalités Actuelles (v2.1)
+## ✨ Fonctionnalités Actuelles (v2.2)
 
 Le bot a été entièrement réécrit pour offrir une stabilité maximale, sans crash, même avec de gros messages ou des requêtes intensives.
 
 | Catégorie | Commandes / Explications |
 |-----------|-------------------------|
-| **Contrôle** | `/start` — Démarrer le bot.<br>`/opencode_start` — Démarrer le serveur API opencode.<br>`/opencode_stop` — Stopper le serveur API opencode. |
+| **Contrôle** | `/start` — Menu principal.<br>`/opencode_start` — Démarrer le serveur API opencode.<br>`/opencode_stop` — Stopper le serveur API opencode. |
 | **Sécurité** | `/permissions` — Gérer l'approbation des commandes bash : Demander, Autoriser tout, Bloquer tout. |
-| **Modèles** | `/models` — Sélectionner le modèle IA via un menu interactif (Deepseek, Nemotron, etc.). |
+| **Modèles** | `/models` — Sélectionner le modèle IA + variante (high, max, minimal, défaut) via un menu interactif. |
 | **Sessions** | `/session` — Gérer vos conversations (Reprendre ou Supprimer).<br>`/new` — Démarrer une nouvelle session fraîche. |
 | **Système** | `/version` — Version actuelle d'opencode.<br>`/stats` — Statistiques d'utilisation.<br>`/upgrade` — Mettre à jour opencode.<br>`/config` — Afficher la configuration. |
+| **Administration** | `/grant` — Créer un code d'accès invité à usage unique.<br>`/auth` — S'authentifier avec un code invité. |
+
+## 🔐 Accès privé
+
+Le bot est privé par défaut :
+- **Admin** : accès complet à toutes les commandes (défini via `ADMIN_CHAT_ID` dans `.env_bot`).
+- **Invités** : accès restreint aux commandes `/start`, `/version`, `/stats` + envoi de messages à l'IA.
+- **Non-authentifiés** : voient uniquement l'écran d'accueil avec instruction `/auth CODE`.
+
+L'admin génère des codes avec `/grant`, l'invité les utilise avec `/auth CODE`.
 
 ## 🔮 Nouveautés à Venir (Roadmap)
 

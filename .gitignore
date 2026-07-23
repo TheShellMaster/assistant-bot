@@ -1,6 +1,7 @@
 .env_assistant
 .env_bot
-.auth_ids.json
+.auth_codes.json
+.authorized_ids.json
 __pycache__/
 *.pyc
 *.pyo
