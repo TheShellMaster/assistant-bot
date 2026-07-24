@@ -9,7 +9,7 @@
 
 Une interface Telegram complète, interactive et ultra-stable pour [opencode](https://opencode.ai). Développée en Python, elle permet de contrôler entièrement vos sessions de développement IA depuis votre téléphone ou votre bureau, avec une gestion robuste des processus système (venv, systemd).
 
-## ✨ Fonctionnalités Actuelles (v2.2)
+## ✨ Fonctionnalités Actuelles (v2.3)
 
 Le bot a été entièrement réécrit pour offrir une stabilité maximale, sans crash, même avec de gros messages ou des requêtes intensives.
 

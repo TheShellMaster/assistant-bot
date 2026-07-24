@@ -26,11 +26,16 @@ command -v sudo       >/dev/null 2>&1 || err "sudo requis."
 if ! command -v opencode &>/dev/null; then
     info "Installation d'opencode..."
     curl -fsSL https://opencode.ai/install.sh | bash
-    echo 'export PATH="$HOME/.opencode/bin:$PATH"' >> ~/.bashrc
+    grep -q 'opencode/bin' ~/.bashrc 2>/dev/null || echo 'export PATH="$HOME/.opencode/bin:$PATH"' >> ~/.bashrc
     export PATH="$HOME/.opencode/bin:$PATH"
     ok "opencode installé."
 else
-    ok "opencode déjà présent ($(opencode --version 2>/dev/null || echo '?'))"
+    OPENCODE_BIN="$HOME/.opencode/bin/opencode"
+    if [ -x "$OPENCODE_BIN" ]; then
+        ok "opencode déjà présent ($($OPENCODE_BIN --version))"
+    else
+        ok "opencode déjà présent"
+    fi
 fi
 
 # ---- 2. Environnement Virtuel Python ----
@@ -43,7 +48,7 @@ else
 fi
 
 info "Installation des dépendances Python dans le venv..."
-"$BOT_DIR/venv/bin/pip" install -r "$BOT_DIR/requirements.txt"
+"$BOT_DIR/venv/bin/pip" install --upgrade -r "$BOT_DIR/requirements.txt"
 ok "Dépendances installées."
 
 # ---- 3. Token Telegram ----
