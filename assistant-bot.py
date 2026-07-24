@@ -70,6 +70,7 @@ DEFAULT_CONFIG = {
     "agent":            "",
     "continue_session": True,
     "session_id":       "",
+    "opencode_enabled": True,
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -148,6 +149,20 @@ def load_config() -> dict:
 def save_config(cfg: dict) -> None:
     CONFIG_FILE.write_text(json.dumps(cfg, indent=2))
 
+def _load_opencode_enabled() -> bool:
+    try:
+        return load_config().get("opencode_enabled", True)
+    except Exception:
+        return True
+
+def _save_opencode_enabled(val: bool) -> None:
+    try:
+        cfg = load_config()
+        cfg["opencode_enabled"] = val
+        save_config(cfg)
+    except Exception:
+        pass
+
 def get_token() -> Optional[str]:
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if token:
@@ -176,6 +191,7 @@ def _is_server_alive() -> bool:
 def start_opencode() -> bool:
     global opencode_proc, opencode_enabled
     opencode_enabled = True
+    _save_opencode_enabled(True)
     if opencode_proc and opencode_proc.poll() is None and _is_server_alive():
         log.info("opencode déjà actif (pid=%d)", opencode_proc.pid)
         return True
@@ -198,6 +214,7 @@ def start_opencode() -> bool:
 def stop_opencode() -> None:
     global opencode_proc, opencode_enabled
     opencode_enabled = False
+    _save_opencode_enabled(False)
     if opencode_proc:
         opencode_proc.terminate()
         try:
@@ -827,6 +844,12 @@ def main() -> None:
     
     log.info("Démarrage du bot…")
     app.run_polling()
+
+# Charger l'etat persiste d'opencode (apres la definition de load_config)
+try:
+    opencode_enabled = _load_opencode_enabled()
+except Exception:
+    pass
 
 if __name__ == "__main__":
     main()
